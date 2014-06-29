@@ -81,8 +81,6 @@ class Condition {
 	 */
 	public function setRules(array $rules = array())
 	{
-		if(empty($rules)) throw new Exceptions\ConditionsInvalidRulesException;
-
 		$this->rules = $rules;
 	}
 

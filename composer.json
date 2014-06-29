@@ -1,6 +1,7 @@
 {
     "name": "siteshop/conditions",
     "description": "A package that allows you to apply conditions on Illuminate Collections",
+    "keywords": ["laravel", "conditions"],
     "license": "Proprietary",
     "authors": [
         {
