@@ -2,28 +2,7 @@
 
 use Illuminate\Support\Collection;
 
-class Condition {
-
-	/**
-	 *   The condition attributes holder
-	 *
-	 *   @var array
-	 */
-	protected $condition = [];
-
-	/**
-	 *   The rules holder
-	 *
-	 *   @var array
-	 */
-	protected $rules = [];
-
-	/**
-	 *   The actions attributes holder
-	 *
-	 *   @var array
-	 */
-	protected $actions = [];
+class Condition extends Collection {
 
 	/**
 	 *   Collection to apply the condition on
@@ -38,12 +17,6 @@ class Condition {
 	protected $operators = ['=', '!=', '<', '<=', '>', '>='];
 
 	/**
-	 *   Condition result
-	 *   @var  integer
-	 */
-	protected $result = 0;
-
-	/**
 	 *   Create a new condition
 	 *
 	 *   @param  array  $condition
@@ -55,7 +28,7 @@ class Condition {
 
 		if(empty($condition['target'])) throw new Exceptions\ConditionsInvalidConditionTargetException;
 
-		$this->condition = $condition;
+		$this->put('condition', new Collection($condition));
 	}
 
 	/**
@@ -70,7 +43,7 @@ class Condition {
 
 		if(empty($actions['value'])) throw new Exceptions\ConditionsInvalidActionValueException;
 
-		$this->actions = $actions;
+		$this->put('actions', new Collection($actions));
 	}
 
 	/**
@@ -81,7 +54,7 @@ class Condition {
 	 */
 	public function setRules(array $rules = array())
 	{
-		$this->rules = $rules;
+		$this->put('rules', $rules);
 	}
 
 	public function apply(Collection $collection)
@@ -93,20 +66,30 @@ class Condition {
 			return $this->applyActions();
 		}
 
-		return $this->collection->get( $this->condition['target'] );
+		return $this->collection->get( $this->dot('condition.target') );
+	}
+
+	public function result()
+	{
+		return $this->get('result');
+	}
+
+	public function target()
+	{
+		return $this->dot('condition.target');
 	}
 
 	protected function applyActions()
 	{
-		$val = $this->collection->get( $this->condition['target'] );
+		$val = $this->collection->get( $this->dot('condition.target') );
 
-		$action = $this->actions['value'];
+		$action = $this->get('actions');
 
-		$operational = floatval($action);
+		$operational = floatval($action->get('value'));
 
 		if( strpos($action, '%') !== false )
 		{
-			if( array_get($this->actions, 'inclusive', false) )
+			if( $action->has('inclusive', false) )
 			{
 				$new_val = $val / ( 100 + $operational ) * 100;
 			}
@@ -122,9 +105,9 @@ class Condition {
 
 		$result = $new_val - $val;
 
-		if( array_get($this->actions, 'max', false) && $result > array_get($this->actions, 'max') )
+		if( $action->has('max', false) && $result > $action->get('max') )
 		{
-			$result = array_get($this->actions, 'max');
+			$result = $action->get('max');
 			$new_val = $val + $result;
 		}
 
@@ -133,14 +116,9 @@ class Condition {
 		return $new_val;
 	}
 
-	public function result()
-	{
-		return $this->result;
-	}
-
 	protected function setResult($result)
 	{
-		$this->result = $result;
+		$this->put('result', $result);
 	}
 
 	protected function validate()
@@ -149,7 +127,7 @@ class Condition {
 
 		if( $this->collection->isEmpty() ) throw new Exceptions\ConditionsInvalidCollectionException;
 
-		if( ! empty($this->rules) )
+		if( $this->has('rules') && ! empty($this->get('rules')) )
 		{
 			return $this->applyRules();
 		}
@@ -159,7 +137,7 @@ class Condition {
 
 	protected function applyRules()
 	{
-		foreach($this->rules as $rule)
+		foreach($this->get('rules') as $rule)
 		{
 			if( ! $this->checkRule($rule) )
 				return false;
@@ -211,6 +189,27 @@ class Condition {
 		if(count($rule) != 3) throw new Exceptions\ConditionsInvalidRuleFieldException;
 
 		return $rule;
+	}
+
+	protected function dot($keys)
+	{
+		$keys = explode('.', $keys);
+
+		$collection = $this;
+
+		foreach($keys as $key)
+		{
+			if($collection->has($key))
+			{
+				$collection = $collection->get($key);
+			}
+			else
+			{
+				return false;
+			}
+		}
+
+		return $collection;
 	}
 
 }
