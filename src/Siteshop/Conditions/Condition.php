@@ -22,13 +22,14 @@ class Condition extends Collection {
 	 *   @param  array  $condition
 	 *   @return void
 	 */
-	public function __construct(array $condition = array())
+	public function __construct(array $items = array())
 	{
-		if(empty($condition)) throw new Exceptions\ConditionsInvalidConditionException;
+		if(empty($items)) throw new Exceptions\ConditionsInvalidConditionException;
 
-		if(empty($condition['target'])) throw new Exceptions\ConditionsInvalidConditionTargetException;
+		if(empty($items['target'])) throw new Exceptions\ConditionsInvalidConditionTargetException;
 
-		$this->put('condition', new Collection($condition));
+		//$this->put('condition', new Collection($condition));
+		parent::__construct($items);
 	}
 
 	/**
@@ -66,7 +67,7 @@ class Condition extends Collection {
 			return $this->applyActions();
 		}
 
-		return $this->collection->get( $this->dot('condition.target') );
+		return $this->collection->get( $this->get('target') );
 	}
 
 	public function result()
@@ -76,16 +77,23 @@ class Condition extends Collection {
 
 	public function target()
 	{
-		return $this->dot('condition.target');
+		return $this->get('target');
+	}
+
+	public function isInclusive()
+	{
+		return $this->dot('actions.inclusive');
 	}
 
 	protected function applyActions()
 	{
-		$val = $this->collection->get( $this->dot('condition.target') );
+		$val = $this->collection->get( $this->get('target') );
 
 		$action = $this->get('actions');
 
 		$operational = floatval($action->get('value'));
+
+		$operational = $operational * floatval( $this->collection->get($action->get('multiplier'), 1) );
 
 		if( strpos($action, '%') !== false )
 		{
@@ -103,7 +111,7 @@ class Condition extends Collection {
 			$new_val = $val + $operational;
 		}
 
-		$result = $new_val - $val;
+		$result = ($action->has('inclusive', false) ? $val - $new_val : $new_val - $val);
 
 		if( $action->has('max', false) && $result > $action->get('max') )
 		{
@@ -150,34 +158,34 @@ class Condition extends Collection {
 	{
 		$rule = $this->formatRule($rule);
 
-		if( ! $this->collection->get($rule[0]) ) throw new Exceptions\ConditionsInvalidRuleFieldException;
+		if( ! $this->dot($rule[0], false, $this->collection) ) throw new Exceptions\ConditionsInvalidRuleFieldException;
 
 		if( ! in_array($rule[1], $this->operators) ) throw new Exceptions\ConditionsInvalidRuleOperatorException;
 
 		switch($rule[1])
 		{
 			case "=":
-				return ($this->collection->get($rule[0]) == ($this->collection->has($rule[2]) ? $this->collection->get($rule[2]) : $rule[2]));
+				return ( $this->dot($rule[0], false, $this->collection) == ($this->dot($rule[2], false, $this->collection) ? $this->dot($rule[2], false, $this->collection) : $rule[2]) );
 			break;
 
 			case "!=":
-				return ($this->collection->get($rule[0]) != ($this->collection->has($rule[2]) ? $this->collection->get($rule[2]) : $rule[2]));
+				return ( $this->dot($rule[0], false, $this->collection) != ($this->dot($rule[2], false, $this->collection) ? $this->dot($rule[2], false, $this->collection) : $rule[2]) );
 			break;
 
 			case "<":
-				return (floatval($this->collection->get($rule[0])) < floatval($this->collection->has($rule[2]) ? $this->collection->get($rule[2]) : $rule[2]));
+				return ( floatval($this->dot($rule[0], false, $this->collection)) < floatval($this->dot($rule[2], false, $this->collection) ? $this->dot($rule[2], false, $this->collection) : $rule[2]) );
 			break;
 
 			case "<=":
-				return (floatval($this->collection->get($rule[0])) <= floatval($this->collection->has($rule[2]) ? $this->collection->get($rule[2]) : $rule[2]));
+				return ( floatval($this->dot($rule[0], false, $this->collection)) <= floatval($this->dot($rule[2], false, $this->collection) ? $this->dot($rule[2], false, $this->collection) : $rule[2]) );
 			break;
 
 			case ">":
-				return (floatval($this->collection->get($rule[0])) > floatval($this->collection->has($rule[2]) ? $this->collection->get($rule[2]) : $rule[2]));
+				return ( floatval($this->dot($rule[0], false, $this->collection)) > floatval($this->dot($rule[2], false, $this->collection) ? $this->dot($rule[2], false, $this->collection) : $rule[2]) );
 			break;
 
 			case ">=":
-				return (floatval($this->collection->get($rule[0])) >= floatval($this->collection->has($rule[2]) ? $this->collection->get($rule[2]) : $rule[2]));
+				return ( floatval($this->dot($rule[0], false, $this->collection)) >= floatval($this->dot($rule[2], false, $this->collection) ? $this->dot($rule[2], false, $this->collection) : $rule[2]) );
 			break;
 		}
 	}
@@ -191,11 +199,12 @@ class Condition extends Collection {
 		return $rule;
 	}
 
-	protected function dot($keys)
+	protected function dot($keys, $default = false, $collection = null)
 	{
 		$keys = explode('.', $keys);
 
-		$collection = $this;
+		if( ! $collection )
+			$collection = $this;
 
 		foreach($keys as $key)
 		{
@@ -205,7 +214,7 @@ class Condition extends Collection {
 			}
 			else
 			{
-				return false;
+				return $default;
 			}
 		}
 
